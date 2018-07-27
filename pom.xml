@@ -11,6 +11,21 @@
 	  	<version>4.3.18.RELEASE</version>
 	  </dependency>
 
+	  <!-- https://mvnrepository.com/artifact/com.mchange/c3p0 -->
+	  <dependency>
+		  <groupId>com.mchange</groupId>
+		  <artifactId>c3p0</artifactId>
+		  <version>0.9.5.2</version>
+	  </dependency>
+
+	  <!-- https://mvnrepository.com/artifact/com.microsoft.sqlserver/sqljdbc4 -->
+	  <dependency>
+		  <groupId>com.microsoft.sqlserver</groupId>
+		  <artifactId>sqljdbc4</artifactId>
+		  <version>4.0</version>
+		  <scope>test</scope>
+	  </dependency>
+
 	  <dependency>
 	  	<groupId>junit</groupId>
 	  	<artifactId>junit</artifactId>
