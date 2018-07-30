@@ -14,6 +14,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Controller;
 import org.springframework.stereotype.Service;
 
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurerAdapter;
 import spring_annotation.bean.Blue;
 import spring_annotation.bean.MyImportBeanDefinitionRegistrar;
 import spring_annotation.bean.MyImportSelector;

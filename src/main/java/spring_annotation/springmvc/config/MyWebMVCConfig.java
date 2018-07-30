@@ -1,10 +1,14 @@
 package spring_annotation.springmvc.config;
 
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 import org.springframework.web.servlet.support.AbstractAnnotationConfigDispatcherServletInitializer;
 
 /**
  * 启动WEB时，会自动创建对象，调用方法来初始化对象及前端控制器
  */
+@Configuration
+@EnableWebMvc
 public class MyWebMVCConfig extends AbstractAnnotationConfigDispatcherServletInitializer {
 
     /**
@@ -12,7 +16,7 @@ public class MyWebMVCConfig extends AbstractAnnotationConfigDispatcherServletIni
      * @return
      */
     protected Class<?>[] getRootConfigClasses() {
-        return new Class[]{RootConfig.class};
+        return new Class[]{(RootConfig.class)};
     }
 
     /**
@@ -20,7 +24,7 @@ public class MyWebMVCConfig extends AbstractAnnotationConfigDispatcherServletIni
      * @return
      */
     protected Class<?>[] getServletConfigClasses() {
-        return new Class[]{ServletConfig.class};
+        return new Class[]{(ServletConfig.class)};
     }
 
     /**

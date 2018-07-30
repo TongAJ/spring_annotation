@@ -1,0 +1,187 @@
+Spring创建和刷新-->
+AnnotationConfigApplicationContext-->
+    this.refresh（）-->
+
+        1.this.prepareRefresh（）;
+            1）【初始化属性设置；交由存在的子类中可以自定义属性个性化设置方法】this.initPropertySources（）;
+            2）【校验属性合法性】this.getEnvironment（）.validateRequiredProperties（）;
+            3）【保存容器中早起的事件】this.earlyApplicationEvents = new LinkedHashSet（）;
+
+        2.ConfigurableListableBeanFactory beanFactory = this.obtainFreshBeanFactory（）;
+            1）【刷新bean工厂】this.refreshBeanFactory（）;
+                1））【创建beanFactory】this.beanFactory = new DefaultListableBeanFactory（）;
+                2））【设置序列化id】
+            2）【返回刚刚创建的beanFactory--DefaultListableBeanFactory】ConfigurableListableBeanFactory beanFactory = this.getBeanFactory（）;
+
+        3.this.prepareBeanFactory（beanFactory）;【对BeanFactory作预处理工作】
+            1）【设置类加载器】beanFactory.setBeanClassLoader（this.getClassLoader（））;
+                【表达式解析器】beanFactory.setBeanExpressionResolver（new StandardBeanExpressionResolver（beanFactory.getBeanClassLoader（）））;
+                .......
+            2）【添加部分的BeanPostProcessor】beanFactory.addBeanPostProcessor（new ApplicationContextAwareProcessor（this））;
+            3）【设置忽略依赖的接口】beanFactory.ignoreDependencyInterface（EnvironmentAware.class）;
+            4）【注册可以解析的自动装配：我们可以在容器中自动注入】
+               beanFactory.registerResolvableDependency
+               （BeanFactory.class, beanFactory、ApplicationContext（IOC））;...
+            5）【添加ApplicationListenerDetector的BeanPostProcessor】beanFactory.addBeanPostProcessor（new ApplicationListenerDetector（this））;
+            6）【添加AspectJ】beanFactory.addBeanPostProcessor(new LoadTimeWeaverAwareProcessor(beanFactory));
+            7）【添加环境组件environment】beanFactory.registerSingleton("environment", this.getEnvironment());
+                1））【添加环境组件systemProperties】beanFactory.registerSingleton("systemProperties", this.getEnvironment().getSystemProperties());
+                2））【添加环境组件systemEnvironment】beanFactory.registerSingleton("systemEnvironment", this.getEnvironment().getSystemEnvironment());
+
+        4.this.postProcessBeanFactory(beanFactory);
+        【BeanFactory准备完成后的后置处理工作】
+            1）子类可以通过重写postProcessBeanFactory实现后置处理
+
+===============================以上是BeanFactory创建及预准备工作=================================
+
+        5.this.invokeBeanFactoryPostProcessors(beanFactory);
+        【在BeanFactory标准初始化之后执行的（前面的4个步骤）】--两个接口：BeanFactoryPostProcessor、BeanDefinitionRegistryPostProcessor
+            1）【执行invokeBeanFactoryPostProcessors】PostProcessorRegistrationDelegate.invokeBeanFactoryPostProcessors(beanFactory, this.getBeanFactoryPostProcessors());
+                1））【获取所有BeanDefinitionRegistryPostProcessor】String[] postProcessorNames = beanFactory.getBeanNamesForType(BeanDefinitionRegistryPostProcessor.class, true, false);
+                2））【按优先级排序注册BeanDefinitionRegistryPostProcessor，并执行后知处理的postProcessBeanDefinitionRegistry方法】PriorityOrdered--》Ordered--》剩下没有实现优先级接口的，
+                3））【获取所有的BeanFactoryPostProcessor】String[] postProcessorNames = beanFactory.getBeanNamesForType(BeanFactoryPostProcessor.class, true, false);
+                4））【按优先级排序注册BeanFactoryPostProcessor，并执行后知处理的postProcessBeanFactory方法】PriorityOrdered--》Ordered--》剩下没有实现优先级接口的，
+
+        6.this.registerBeanPostProcessors(beanFactory);【注册BeanPostProcessors，作用是拦截Bean的创建过程的】
+           子接口：不同的BeanPostProcessor创建时间是不同的
+           --DestructionAwareBeanPostProcessor
+           --InstantiationAwareBeanPostProcessor
+            ----SmartInstantiationAwareBeanPostProcessor
+           --MergedBeanDefinitionPostProcessor【存放在List<BeanPostProcessor> internalPostProcessors】
+
+           1）【获取所有的BeanPostProcessors】：也有优先级
+                PriorityOrdered--》Ordered--》剩下没有实现优先级接口的，
+           2）【按顺序，把每一个BeanPostProcessor放进beanFactory】beanFactory.addBeanPostProcessor(postProcessor);
+           3）【最后注册internalPostProcessors里的MergedBeanDefinitionPostProcessor】
+           4）【查看是否为ApplicationListener，是的话也存放在IOC容器中】beanFactory.addBeanPostProcessor(new ApplicationListenerDetector(applicationContext));
+
+        7.this.initMessageSource();【初始化并创建MessageSource组件，作用于国际化】
+            1）【获取BeanFactory】ConfigurableListableBeanFactory beanFactory = this.getBeanFactory();
+            2）【查看是否有messageSource组件，有的话就赋值MessageSource】
+                this.messageSource = (MessageSource)beanFactory.getBean("messageSource", MessageSource.class);
+            3）【如果没有】
+                DelegatingMessageSource dms = new DelegatingMessageSource();
+
+        8.this.initApplicationEventMulticaster();【初始化事件派发器】
+            1）【获取BeanFactory】
+            2）【获取BeanFactory中的applicationEventMulticaster组件】
+            3）【如果没有配置ApplicationEventMulticaster,注册SimpleApplicationEventMulticaster】
+                this.applicationEventMulticaster = new SimpleApplicationEventMulticaster(beanFactory);
+                beanFactory.registerSingleton("applicationEventMulticaster", this.applicationEventMulticaster);
+
+        9.this.onRefresh();【留给子类，实现自己的onRefresh方法】
+
+        10.this.registerListeners();【将所有ApplicationListener都加入到ApplicationEventMulticaster】
+
+        11.finishBeanFactoryInitialization
+            1）【初始化剩下的单实例bean】beanFactory.preInstantiateSingletons();
+                1））【获取所有的beanDefinitionNames，依次进行初始化创建】List<String> beanNames = new ArrayList(this.beanDefinitionNames);
+                判断是否是beanFactory：
+                    是：final FactoryBean<?> factory = (FactoryBean)this.getBean("&" + beanName);
+                    否：this.getBean(beanName);
+                        1.this.doGetBean(name, (Class)null, (Object[])null, false);
+                        2.【先看缓存中是否有Bean】Object sharedInstance = this.getSingleton(beanName);
+                        3.【查看是否有父子类BeanFactory】
+                        4.【标记这个单实例类】this.markBeanAsCreated(beanName);
+                        5.【获取bean的定义信息】final RootBeanDefinition mbd = this.getMergedLocalBeanDefinition(beanName);
+                        6.【获取当前bean依赖的其他bean，如果有，先对依赖的bean进行getBean(beanName)】String[] dependsOn = mbd.getDependsOn();
+                        7.【create当前bean】return AbstractBeanFactory.this.createBean(beanName, mbd, args);
+                        8.【bean实例化前，让beanPostProcessor拦截，并创建bean的代理对象】beanInstance = this.resolveBeforeInstantiation(beanName, mbdToUse);
+                            InstantiationAwareBeanPostProcessor提前执行
+                                先触发postProcessBeforeInstantiation方法
+                                如果前者有返回值，再触发postProcessAfterInstantiation
+                        9.【如果InstantiationAwareBeanPostProcessor提前执行没有创建并返回代理对象，则创建】
+                            1.beanInstance = this.doCreateBean(beanName, mbdToUse, args);
+                            【利用工厂方法或者对象构造器创建对象】
+                            2.this.applyMergedBeanDefinitionPostProcessors(mbd, beanType, beanName);
+                            【允许MergedBeanDefinitionPostProcessor后置处理器进行处理工作】bdp.postProcessMergedBeanDefinition(mbd, beanType, beanName);
+                            3.【bean属性初始化】this.populateBean(beanName, mbd, instanceWrapper);
+                                【赋值之前】
+                                    InstantiationAwareBeanPostProcessor.postProcessAfterInstantiation
+                                    InstantiationAwareBeanPostProcessor.postProcessPropertyValues
+                                【赋值】
+                                    this.applyPropertyValues(beanName, mbd, bw, (PropertyValues)pvs);
+                            4.【创建bean】exposedObject = this.initializeBean(beanName, exposedObject, mbd);
+                                1）【如果bean实现了aware接口，执行aware接口的方法】
+                                    this.invokeAwareMethods(beanName, bean);
+                                2）【执行后置处理器的postProcessBeforeInitialization方法】wrappedBean = this.applyBeanPostProcessorsBeforeInitialization(bean, beanName);
+                                        1））result = beanProcessor.postProcessBeforeInitialization(result, beanName);
+                                3）【是否为InitializingBean的bean，是的话执行对象的初始化init方法】this.invokeInitMethods(beanName, wrappedBean, mbd);
+                                4）【不是的话就执行自定义的初始化方法】
+                                5）【执行后置处理器的postProcessAfterInitialization方法】wrappedBean = this.applyBeanPostProcessorsAfterInitialization(wrappedBean, beanName);
+                                6）【注册bean的销毁方法】
+                            5.创建bean完成，并将已经创建的bean添加到singletonBean的缓存中
+                            6.创建完所有的bean，检查是否有实现SmartInitializingSingleton接口，如果是则执行afterSingletonsInstantiated
+
+        12.this.finishRefresh();【完成ioc容器所有的工作】
+            1）【初始化LifecycleProcessor】this.initLifecycleProcessor();
+            2）【拿到LifecycleProcessor，回调onRefresh】this.getLifecycleProcessor().onRefresh();
+            3）【发布容器刷新ContextRefreshedEvent事件】 this.publishEvent((ApplicationEvent)(new ContextRefreshedEvent(this)));
+            4）LiveBeansView.registerApplicationContext(this);
+
+==========================IOC容器完成所有初始化工作==================================================
+
+
+==========================总结==================================================
+
+    1.Spring注册的时候，先保存所有bean的定义信息
+        1）通过xml配置信息内的<bean>标签
+        2）通过@Component、@Bean....等注解
+
+    2.Spring在合适的时间创建这些Bean
+        1）用的时候，用getBean的方式创建Bean并保存到Bean的缓存中
+        2）统一创建剩下的单实例Bean---》11.finishBeanFactoryInitialization
+
+    3.【**核心思想】后置处理器：
+        1.每一个bean创建完成后，都会调用后置处理器的方法来增强bean的功能
+            【例子：】
+            AutowiredAnnotationBeanPostProcessor，用来处理@Autowired，自动注入功能
+            AspectJAwareAdvisorAutoProxyCreator，用来处理@AspectJ，加入AOP功能
+    4.【核心思想】事件驱动模型
+        1.ApplicationListener--》事件监听
+        2.ApplicationEventMulticaster--》事件派发
+
+
+========================Spring整合Servlet3.0=======================================
+    1.扫描每个jar中的META-INF/services/javax.servlet.ServletContainerInitializer
+    2.Spring容器启动时会自动加载ServletContainerInitializer组件
+        1）@HandlesTypes({WebApplicationInitializer.class})
+            1））启动加载WebApplicationInitializer下的所有子类，子接口和实现
+        2）并且为WebApplicationInitializer下的所有非接口和非抽象类的对象的创建
+            1））AbstractContextLoaderInitializer：
+            【创建根容器】WebApplicationContext rootAppContext = this.createRootApplicationContext();
+            2））AbstractDispatcherServletInitializer：
+            【创建一个IOC容器】WebApplicationContext servletAppContext = this.createServletApplicationContext();
+            【创建DispatcherServlet】FrameworkServlet dispatcherServlet = this.createDispatcherServlet(servletAppContext);
+            【将创建的DispatcherServlet加入到容器中】Dynamic registration = servletContext.addServlet(servletName, dispatcherServlet);
+                【并且交由子类实现registration.addMapping(this.getServletMappings());】
+            3））AbstractAnnotationConfigDispatcherServletInitializer：注解的方式配置DispatchServlet
+            【创建根容器】createRootApplicationContext()
+                this.getRootConfigClasses()【传入一个配置类】
+            【创建WEB容器】createServletApplicationContext
+                getServletConfigClasses【获取配置类】
+
+总结：
+    以注解的方式启动SpringMVC，继承AbstractAnnotationConfigDispatcherServletInitializer
+    实现抽象方法指定的DispatchServlet的配置信息
+
+    定制自己的MVC配置
+        1：@EnableWebMvc:开启SpringMvc的配置功能
+        <mvc:annotation-driven/>
+
+        2:配置组件（视图解析器、视图映射、静态资源映射、拦截器等）
+        (spring IOC)extends WebMvcConfigurerAdapter
+            【public abstract class WebMvcConfigurerAdapter implements WebMvcConfigurer】
+
+        高级用法--处理异步请求
+        1：返回Callable<V>（不怎么使用）
+        2：使用DeferredResult<T>
+        【详情】：springmvc包内
+
+
+
+
+
+
+
+
